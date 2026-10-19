@@ -364,6 +364,11 @@ async fn test_regular_abort_for_db_only_matching_db_key() {
       tokio::time::sleep(std::time::Duration::from_secs(60)).await;
    });
 
+   // Keep abort handles to observe the tasks once the tracker owns them.
+   // abort_for_db awaits every task it aborts, so is_finished() is settled.
+   let main_task = main_handle.abort_handle();
+   let other_task = other_handle.abort_handle();
+
    state
       .insert("main".into(), "main-one".into(), main_handle)
       .await;
@@ -373,8 +378,22 @@ async fn test_regular_abort_for_db_only_matching_db_key() {
 
    state.abort_for_db("main").await.unwrap();
 
+   assert!(
+      main_task.is_finished(),
+      "abort_for_db(\"main\") should abort and await the `main` transaction task"
+   );
+   assert!(
+      !other_task.is_finished(),
+      "abort_for_db(\"main\") must not abort the `other` transaction task"
+   );
+
    // Other database transaction should still be tracked and abortable.
    state.abort_for_db("other").await.unwrap();
+
+   assert!(
+      other_task.is_finished(),
+      "`other` transaction should still be tracked so abort_for_db(\"other\") aborts it"
+   );
 }
 
 #[tokio::test]
@@ -388,13 +407,33 @@ async fn test_regular_abort_for_db_does_not_match_colon_prefix_alias() {
       tokio::time::sleep(std::time::Duration::from_secs(60)).await;
    });
 
+   // Keep abort handles to observe the tasks once the tracker owns them.
+   // abort_for_db awaits every task it aborts, so is_finished() is settled.
+   let a_task = a_handle.abort_handle();
+   let ab_task = ab_handle.abort_handle();
+
    state.insert("a".into(), "a-tx".into(), a_handle).await;
    state.insert("a:b".into(), "ab-tx".into(), ab_handle).await;
 
    state.abort_for_db("a").await.unwrap();
 
+   assert!(
+      a_task.is_finished(),
+      "abort_for_db(\"a\") should abort and await the `a` transaction task"
+   );
+
    // Closing `a` must not abort the transaction belonging to database `a:b`.
+   assert!(
+      !ab_task.is_finished(),
+      "abort_for_db(\"a\") must not abort the `a:b` transaction task"
+   );
+
    state.abort_for_db("a:b").await.unwrap();
+
+   assert!(
+      ab_task.is_finished(),
+      "`a:b` transaction should still be tracked so abort_for_db(\"a:b\") aborts it"
+   );
 }
 
 // ============================================================================
