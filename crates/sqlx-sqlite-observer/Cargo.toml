@@ -36,3 +36,4 @@ tokio = { version = "1.49.0", features = ["full", "macros"] }
 futures = "0.3.31"
 tempfile = "3.24.0"
 tracing-subscriber = "0.3.22"
+rstest = { version = "0.28.0", default-features = false }
