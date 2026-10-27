@@ -4,12 +4,32 @@ on:
    push: # Runs on push to any branch
    pull_request:
       branches: [ "master" ]
+   schedule:
+      - cron: '23 6 * * 1'
 
 env:
    CARGO_TERM_COLOR: always
 
 jobs:
+   dependencies:
+      name: Rust Dependency Policy
+      runs-on: ubuntu-latest
+      permissions:
+         contents: read
+
+      steps:
+         - name: Checkout repository
+           uses: actions/checkout@v4
+
+         - name: Check Rust dependencies
+           uses: EmbarkStudios/cargo-deny-action@v2
+           with:
+              rust-version: '1.94.0'
+              arguments: --workspace --all-features --locked
+              command: check
+
    ci:
+      if: github.event_name != 'schedule'
       name: Continuous Integration
       runs-on: ubuntu-latest
 
